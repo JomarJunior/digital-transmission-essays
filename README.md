@@ -56,3 +56,8 @@ This repository contains essays on digital transmission, which are part of the r
    poetry add ipykernel
    python -m ipykernel install --user --name=.venv
    ```
+
+## Results
+
+![Received 16-PSK Constellation over CUSTOM Channel with 20.0 dB SNR](Received_16-PSK_Constellation_over_CUSTOM_Channel_with_20.0_dB_SNR.png)
+![Received 16-PSK Constellation over FLAT Channel with 20.0 dB SNR](Received_16-PSK_Constellation_over_FLAT_Channel_with_20.0_dB_SNR.png)
