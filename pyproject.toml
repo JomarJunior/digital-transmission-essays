@@ -7,7 +7,7 @@ name = "digital-transmission-essays"
 version = "0.1.0"
 description = "Simulations and analysis for Digital Transmission course projects (OFDM, OTFS, AFDM, BER vs SNR)"
 authors = [
-    { name = "Your Name", email = "your.email@example.com" }
+    { name = "Jomar Júnior de Souza Pereira", email = "jomarjunior@poli.ufrj.br" }
 ]
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,10 +19,21 @@ dependencies = [
     "pandas>=2.1",
     "sympy>=1.12",
     "notebook>=7.0",
+    "pydantic (>=2.11.9,<3.0.0)",
+]
+
+[tool.poetry]
+packages = [
+    { include = "configuration", from = "src" },
+    { include = "bits_generator", from = "src" },
+    { include = "symbol_mapping", from = "src" },
+    { include = "modulation", from = "src"},
+    { include = "channel", from = "src" },
+    { include = "equalization", from = "src" },
 ]
 
 [tool.black]
-line-length = 88
+line-length = 100
 target-version = ["py310"]
 skip-string-normalization = false
 
@@ -39,7 +50,7 @@ disable = [
 ]
 
 [tool.pylint.format]
-max-line-length = 88
+max-line-length = 100
 
 [tool.setuptools.packages.find]
 where = ["src"]
