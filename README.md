@@ -5,7 +5,17 @@ This repository contains essays on digital transmission, which are part of the r
 ## 📚 Stack
 
 - 🐍 Python 3.13
-- 📦 Poetry
+- 📦 Poetry: Package management
+- 🧪 Pytest: Testing framework
+- 🖋️ Black: Code formatter
+- 🔎 Pylint: Code linter
+- 🔄 Isort: Import sorter
+- 📓 Jupyter Notebooks: Interactive computing
+- 📊 Matplotlib: Plotting library
+- 🧮 NumPy: Numerical computing
+- 📈 Pandas: Data manipulation and analysis
+- 📐 SciPy: Scientific computing
+- 🂡 Sympy: Symbolic mathematics
 
 ## 🚀 Getting Started
 
