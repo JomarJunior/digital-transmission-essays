@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from configuration.base import Settings, SimulationSettings
 from bits_generator.base import BitsGenerator
-from configuration.enums import PrefixType
+from configuration.enums import PrefixType, EqualizationMethod
 from symbol_mapping.factory import SymbolMapperFactory
 from modulation.base import (
     CyclicPrefixScheme,
@@ -12,7 +12,8 @@ from modulation.base import (
     ZeroPrefixScheme,
 )
 from channel.factory import ChannelFactory
-from channel.enums import ChannelType
+from channel.enums import ChannelType, NoiseType
+from equalization.factory import EqualizationFactory
 
 
 def main():
@@ -41,7 +42,7 @@ def main():
         random_bits = bits_generator.generate_bits(total_bits)
     print("Random Bits:", random_bits, " len=", len(random_bits))
 
-    snr_index = 4  # Index to select SNR value from the list
+    snr_index = 6  # Index to select SNR value from the list
 
     # -----------------------------------------------------------------
     # Create channel model
@@ -49,13 +50,10 @@ def main():
 
     channel, channel_time_domain_size = None, None
     if sim_settings.channel_type == ChannelType.CUSTOM:
-        channel, channel_time_domain_size = (
-            ChannelFactory.create_custom_channel_from_file(
-                snr_db=sim_settings.signal_noise_ratios[snr_index],
-                noise_type=sim_settings.noise_type,
-                filepath=sim_settings.channel_model_path,
-                fft_size=sim_settings.num_bands,
-            )
+        channel, channel_time_domain_size = ChannelFactory.create_custom_channel_from_file(
+            snr_db=sim_settings.signal_noise_ratios[snr_index],
+            noise_type=sim_settings.noise_type,
+            filepath=sim_settings.channel_model_path,
         )
 
     if sim_settings.channel_type == ChannelType.FLAT:
@@ -85,9 +83,7 @@ def main():
 
     # Use a reasonable cyclic prefix length
     print(f"Channel time domain length: {channel_time_domain_size}")
-    cyclic_prefix_length = int(
-        channel_time_domain_size * sim_settings.prefix_length_ratio
-    )
+    cyclic_prefix_length = int(channel_time_domain_size * sim_settings.prefix_length_ratio)
 
     prefix_scheme = None
     if sim_settings.prefix_type == PrefixType.CYCLIC:
@@ -119,24 +115,54 @@ def main():
     print("Transmission over Channel")
     print("-" * 40 + "\n")
 
-    transmitted_signal = ofdm_signal  # OFDM signal is 2D: (num_symbols, fft_size)
+    transmitted_signal = ofdm_signal  # OFDM signal is 2D: (num_symbols, fft_size + prefix_length)
     print(f"Transmitted signal shape: {transmitted_signal.shape}")
 
     # Use the channel's transmit method to handle the 2D OFDM signal
     received_signal = channel.transmit(transmitted_signal)
 
     print(f"Simulated Channel Type: {channel.channel_type}")
-    print(
-        f"Signal-to-Noise Ratio (SNR): {sim_settings.signal_noise_ratios[snr_index]} dB"
-    )
+    print(f"Signal-to-Noise Ratio (SNR): {sim_settings.signal_noise_ratios[snr_index]} dB")
     print(f"Received signal shape: {received_signal.shape}")
 
     # Demodulate received signal
     received_ofdm_symbols = ofdm_modulator.demodulate(received_signal)
-    received_ofdm_symbols_flat = SerialParallelConverter.to_serial(
-        received_ofdm_symbols
+    print(f"Received OFDM symbols shape: {received_ofdm_symbols.shape}")
+
+    # -----------------------------------------------------------------
+    # Equalization
+    # -----------------------------------------------------------------
+    print("\n" + "-" * 40)
+    print("Equalization")
+    print("-" * 40 + "\n")
+
+    # Where to get the noise variance from?
+    # For AWGN channel, it can be derived from SNR and signal power. We calculate it here.
+    noise_variance = None
+    if (
+        sim_settings.noise_type == NoiseType.AWGN
+        and sim_settings.equalization_method == EqualizationMethod.MMSE
+    ):
+        signal_power = np.mean(np.abs(transmitted_signal) ** 2)
+        snr_linear = 10 ** (sim_settings.signal_noise_ratios[snr_index] / 10)
+        noise_variance = signal_power / snr_linear
+        print(f"Calculated noise variance for AWGN: {noise_variance}")
+
+    equalizator = EqualizationFactory.create_equalizator(
+        sim_settings.equalization_method,
+        channel=channel,
+        fft_size=sim_settings.num_bands,
+        noise_variance=noise_variance,
     )
+
+    received_ofdm_symbols = equalizator.equalize(received_ofdm_symbols)
+
+    # -------------------------------------------------
+    # Demodulation
+    # -------------------------------------------------
+    received_ofdm_symbols_flat = SerialParallelConverter.to_serial(received_ofdm_symbols)
     demodulated_bits_channel = symbol_mapper.decode(received_ofdm_symbols_flat)
+
     print(
         "Demodulated Bits from Channel:",
         demodulated_bits_channel,
@@ -145,16 +171,12 @@ def main():
     )
     padding_channel = len(demodulated_bits_channel) - len(random_bits)
     if padding_channel > 0:
-        print(
-            f"Note: {padding_channel} extra bits due to OFDM symbol padding and prefix."
-        )
+        print(f"Note: {padding_channel} extra bits due to OFDM symbol padding and prefix.")
     print(
         f"""Number of Bit Errors:
         {np.sum(random_bits != demodulated_bits_channel[:len(random_bits)])}"""
     )
-    ber = np.sum(random_bits != demodulated_bits_channel[: len(random_bits)]) / len(
-        random_bits
-    )
+    ber = np.sum(random_bits != demodulated_bits_channel[: len(random_bits)]) / len(random_bits)
     print(
         f"""Bit Error Rate (BER):
         {ber:.6f}"""

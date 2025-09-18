@@ -16,3 +16,12 @@ class PrefixType(str, Enum):
 
     def __str__(self):
         return self.value
+
+
+class EqualizationMethod(str, Enum):
+    ZF = "ZF"
+    MMSE = "MMSE"
+    NONE = "NONE"
+
+    def __str__(self):
+        return self.value

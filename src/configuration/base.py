@@ -3,7 +3,7 @@ import json
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
-from configuration.enums import ConstellationType, PrefixType
+from configuration.enums import ConstellationType, PrefixType, EqualizationMethod
 from channel.enums import NoiseType, ChannelType
 
 
@@ -46,9 +46,7 @@ class SimulationSettings(BaseSettings):
         NoiseType.AWGN, description="Type of noise to be added (e.g., AWGN, NONE)"
     )
     num_bits: Optional[int] = Field(None, description="Number of bits to simulate")
-    num_symbols: Optional[int] = Field(
-        None, description="Number of symbols to simulate"
-    )
+    num_symbols: Optional[int] = Field(None, description="Number of symbols to simulate")
     constellation_order: int = Field(
         16, description="Order of the QAM constellation (e.g., 4, 16, 64)"
     )
@@ -63,6 +61,9 @@ class SimulationSettings(BaseSettings):
         0.25,
         description="Ratio of cyclic prefix length to channel time domain size",
     )
+    equalization_method: EqualizationMethod = Field(
+        EqualizationMethod.MMSE, description="Equalization method to be used (e.g., ZF, MMSE, NONE)"
+    )
 
     def __str__(self):
         return (
@@ -72,11 +73,13 @@ class SimulationSettings(BaseSettings):
             f"Channel Model Path: '{self.channel_model_path}'\n"
             f"Noise Type: {self.noise_type}\n"
             f"{'Number of Bits: ' + str(self.num_bits) if self.num_bits is not None else ''}\n"
-            f"{'Number of Symbols: ' + str(self.num_symbols) if self.num_symbols is not None else ''}\n"
+            f"{'Number of Symbols: '
+               + str(self.num_symbols) if self.num_symbols is not None else ''}\n"
             f"Constellation Type: '{self.constellation_type}'\n"
             f"Constellation Order: {self.constellation_order}\n"
             f"Prefix Type: {self.prefix_type}\n"
-            f"Prefix Length Ratio: {self.prefix_length_ratio}"
+            f"Prefix Length Ratio: {self.prefix_length_ratio}\n"
+            f"Equalization Method: {self.equalization_method}"
         )
 
     @field_validator("num_symbols")

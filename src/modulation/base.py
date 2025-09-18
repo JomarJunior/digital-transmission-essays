@@ -24,9 +24,7 @@ class IPrefixScheme(ABC):
         pass
 
     @abstractmethod
-    def remove_prefix(
-        self, received_signal: NDArray[complex128]
-    ) -> NDArray[complex128]:
+    def remove_prefix(self, received_signal: NDArray[complex128]) -> NDArray[complex128]:
         pass
 
 
@@ -37,19 +35,25 @@ class CyclicPrefixScheme(IPrefixScheme):
         self.prefix_length = prefix_length
 
     def add_prefix(self, symbols: NDArray[complex128]) -> NDArray[complex128]:
-        """Add cyclic prefix to symbols."""
+        """Add cyclic prefix to symbols (works for 1D or 2D arrays)."""
+        length = self.prefix_length
+
         if symbols.ndim == 1:
-            prefix = symbols[-self.prefix_length :]
-            return np.concatenate((prefix, symbols))
+            if length > symbols.size:
+                raise ValueError("Prefix length longer than symbol length.")
+            prefix = symbols[-length:]
+            return np.concatenate((prefix, symbols), axis=0)
+
         if symbols.ndim == 2:
-            prefix = symbols[:, -self.prefix_length :]
-            return np.hstack((prefix, symbols))
+            _, symbols_size = symbols.shape
+            if length > symbols_size:
+                raise ValueError("Prefix length longer than symbol length.")
+            prefix = symbols[:, -length:]
+            return np.concatenate((prefix, symbols), axis=1)
 
         raise ValueError("Input symbols must be 1D or 2D array.")
 
-    def remove_prefix(
-        self, received_signal: NDArray[complex128]
-    ) -> NDArray[complex128]:
+    def remove_prefix(self, received_signal: NDArray[complex128]) -> NDArray[complex128]:
         """Remove cyclic prefix from received signal."""
         if received_signal.ndim == 1:
             return received_signal[self.prefix_length :]
@@ -66,9 +70,7 @@ class NoPrefixScheme(IPrefixScheme):
         """No prefix added."""
         return symbols
 
-    def remove_prefix(
-        self, received_signal: NDArray[complex128]
-    ) -> NDArray[complex128]:
+    def remove_prefix(self, received_signal: NDArray[complex128]) -> NDArray[complex128]:
         """No prefix to remove."""
         return received_signal
 
@@ -85,16 +87,12 @@ class ZeroPrefixScheme(IPrefixScheme):
             prefix = np.zeros(self.prefix_length, dtype=symbols.dtype)
             return np.concatenate((prefix, symbols))
         if symbols.ndim == 2:
-            prefix = np.zeros(
-                (symbols.shape[0], self.prefix_length), dtype=symbols.dtype
-            )
+            prefix = np.zeros((symbols.shape[0], self.prefix_length), dtype=symbols.dtype)
             return np.hstack((prefix, symbols))
 
         raise ValueError("Input symbols must be 1D or 2D array.")
 
-    def remove_prefix(
-        self, received_signal: NDArray[complex128]
-    ) -> NDArray[complex128]:
+    def remove_prefix(self, received_signal: NDArray[complex128]) -> NDArray[complex128]:
         """Remove zero prefix from received signal."""
         if received_signal.ndim == 1:
             return received_signal[self.prefix_length :]
@@ -117,7 +115,7 @@ class OFDMModulator(IModulator):
             raise ValueError("Number of symbols must match number of subcarriers.")
 
         # Perform IFFT
-        time_domain_signal = np.fft.ifft(symbols, axis=1, norm="ortho")
+        time_domain_signal = np.fft.ifft(symbols, axis=1, norm="ortho", n=self.num_subcarriers)
 
         # Add prefix
         return self.prefix_scheme.add_prefix(time_domain_signal)
@@ -128,20 +126,17 @@ class OFDMModulator(IModulator):
         signal_no_prefix = self.prefix_scheme.remove_prefix(received_signal)
 
         # Perform FFT
-        return np.fft.fft(signal_no_prefix, axis=1, norm="ortho")
+        return np.fft.fft(signal_no_prefix, axis=1, norm="ortho", n=self.num_subcarriers)
 
 
 class SerialParallelConverter:
     """Utility class for serial-to-parallel and parallel-to-serial conversion."""
 
     @staticmethod
-    def to_parallel(
-        data: NDArray[complex128], num_parallel: int
-    ) -> NDArray[complex128]:
+    def to_parallel(data: NDArray[complex128], num_parallel: int) -> NDArray[complex128]:
         """Convert serial data to parallel format."""
-        print("Data length:", len(data))
-        print("Num parallel:", num_parallel)
         if len(data) % num_parallel != 0:
+            print("Padding data for parallel conversion.")
             # If data length is not a multiple of num_parallel, pad with zeros
             padding_length = num_parallel - (len(data) % num_parallel)
             data = np.concatenate((data, np.zeros(padding_length, dtype=data.dtype)))
