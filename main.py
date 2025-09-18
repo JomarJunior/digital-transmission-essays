@@ -1,19 +1,20 @@
-import numpy as np
+import os
 import matplotlib.pyplot as plt
-from configuration.base import Settings, SimulationSettings
+import numpy as np
 from bits_generator.base import BitsGenerator
-from configuration.enums import PrefixType, EqualizationMethod
-from symbol_mapping.factory import SymbolMapperFactory
+from channel.enums import ChannelType, NoiseType
+from channel.factory import ChannelFactory
+from configuration.base import Settings, SimulationSettings
+from configuration.enums import EqualizationMethod, PrefixType
+from equalization.factory import EqualizationFactory
 from modulation.base import (
     CyclicPrefixScheme,
+    NoPrefixScheme,
     OFDMModulator,
     SerialParallelConverter,
-    NoPrefixScheme,
     ZeroPrefixScheme,
 )
-from channel.factory import ChannelFactory
-from channel.enums import ChannelType, NoiseType
-from equalization.factory import EqualizationFactory
+from symbol_mapping.factory import SymbolMapperFactory
 
 
 def main():
@@ -47,7 +48,6 @@ def main():
     # -----------------------------------------------------------------
     # Create channel model
     # -----------------------------------------------------------------
-
     channel, channel_time_domain_size = None, None
     if sim_settings.channel_type == ChannelType.CUSTOM:
         channel, channel_time_domain_size = ChannelFactory.create_custom_channel_from_file(
@@ -225,8 +225,17 @@ def main():
     plt.grid(False)  # Remove the inner grid
     plt.axis("equal")
     if settings.debug:
-        file_name = plot_title.replace(" ", "_").replace("/", "_")
-        plt.savefig(f"{file_name}.png")
+        file_name = (
+            plot_title.replace(" ", "_")
+            .replace("/", "_")
+            .replace(".0", "")
+            .replace("-", "_")
+            .lower()
+        )
+
+        file_path = f"images/{channel.channel_type.lower()}_channel/{file_name}.png"
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        plt.savefig(file_path, dpi=300)
     else:
         plt.show()
 
