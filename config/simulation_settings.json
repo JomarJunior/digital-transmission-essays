@@ -4,10 +4,10 @@
     "channel_model_path": "config/channel_models/Lin-Phoong_P1.npy",
     "channel_type": "CUSTOM",
     "num_symbols": 1000000,
-    "constellation_order": 256,
+    "constellation_order": 16,
     "constellation_type": "PSK",
     "noise_type": "AWGN",
-    "prefix_type": "CYCLIC",
+    "prefix_type": "ZERO",
     "prefix_length_ratio": 1,
     "equalization_method": "MMSE"
 }

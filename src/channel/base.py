@@ -3,7 +3,7 @@ import numpy as np
 from numpy.typing import NDArray
 from numpy import complex128
 from pydantic import BaseModel
-from channel.enums import NoiseType, ChannelType
+from channel.enums import ChannelType
 
 
 class INoiseModel(ABC):
@@ -31,35 +31,47 @@ class ChannelModel(BaseModel):
     def transmit(self, signal: NDArray[np.complex128]) -> NDArray[np.complex128]:
         """
         Transmit a signal through the channel:
-        - Applies linear convolution with the channel impulse response.
-        - Adds noise afterward.
-        The channel is agnostic to prefixing (CP, ZP, or none).
+        - Serialize blocks into a continuous stream.
+        - Apply convolution with the channel.
+        - Normalize.
+        - Add noise.
+        - Deserialize with overlap (IBI preserved).
         """
 
         h = self.impulse_response
+        L = len(h)
 
         if signal.ndim == 1:
             # Single-carrier case
-            filtered_signal = np.convolve(signal, h, mode="full")
-
+            serialized = signal
+            num_blocks, block_len = 1, len(signal)
         elif signal.ndim == 2:
-            # OFDM case: apply convolution per OFDM symbol (row)
-            num_symbols, n = signal.shape
-            filtered_signal = np.zeros((num_symbols, n + len(h) - 1), dtype=np.complex128)
-
-            for i in range(num_symbols):
-                filtered_signal[i, :] = np.convolve(signal[i, :], h, mode="full")
+            num_blocks, block_len = signal.shape
+            serialized = signal.reshape(-1)
         else:
             raise ValueError(f"Signal must be 1D or 2D, got {signal.ndim}D")
 
-        # Normalize channel energy to 1
-        # Ensures SNR definition is consistent
+        # Convolution
+        filtered_serialized = np.convolve(serialized, h, mode="full")
+
+        # Normalize channel energy
         energy = np.sum(np.abs(h) ** 2)
         if energy > 0:
-            filtered_signal /= np.sqrt(energy)
+            filtered_serialized /= np.sqrt(energy)
 
-        # Add noise using the specified noise model
-        noisy_signal = self.noise_model.add_noise(filtered_signal, self.snr_db)  # type: ignore
+        # Add noise
+        noisy_serialized = self.noise_model.add_noise(filtered_serialized, self.snr_db)  # type: ignore
+
+        # --- Proper deserialization ---
+        if num_blocks == 1:
+            return noisy_serialized
+
+        noisy_blocks = []
+        for i in range(num_blocks):
+            start = i * block_len
+            end = start + block_len + L - 1
+            noisy_blocks.append(noisy_serialized[start:end])
+        noisy_signal = np.vstack(noisy_blocks)
 
         return noisy_signal
 

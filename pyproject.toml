@@ -30,6 +30,7 @@ packages = [
     { include = "modulation", from = "src"},
     { include = "channel", from = "src" },
     { include = "equalization", from = "src" },
+    { include = "simulation", from = "src" },
 ]
 
 [tool.black]
