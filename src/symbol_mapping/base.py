@@ -95,20 +95,17 @@ class QAMConstellationSymbolMapper(IConstellationSymbolMapper):
 
     def decode(self, symbols: NDArray[np.complex128]) -> NDArray[np.int_]:
         """Map received symbols → bit sequence using nearest-neighbor decoding."""
-        bits_out = []
+        # Compute distances for all symbols at once
+        distances = np.abs(self.constellation[:, np.newaxis] - symbols)
+        gray_indices = np.argmin(distances, axis=0)
 
-        for symbol in symbols:
-            distances = np.abs(self.constellation - symbol)
-            gray_index = int(np.argmin(distances))
+        # Convert Gray indices back to binary indices
+        bin_indices = np.vectorize(self.inv_gray_map.get)(gray_indices)
 
-            # Convert Gray index back to binary index
-            bin_index = self.inv_gray_map[gray_index]
+        # Convert binary indices to bit chunks
+        bit_chunks = np.array([list(map(int, bin(idx)[2:].zfill(self.k))) for idx in bin_indices])
 
-            # Convert index to bit chunk
-            bit_chunk = list(map(int, bin(bin_index)[2:].zfill(self.k)))
-            bits_out.extend(bit_chunk)
-
-        return np.array(bits_out, dtype=int)
+        return bit_chunks.flatten()
 
     def symbol_to_binary_word(self, symbol: np.complex128) -> str:
         """Convert a constellation symbol to its corresponding binary word."""

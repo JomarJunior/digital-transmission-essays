@@ -73,8 +73,9 @@ class SimulationSettings(BaseSettings):
             f"Channel Model Path: '{self.channel_model_path}'\n"
             f"Noise Type: {self.noise_type}\n"
             f"{'Number of Bits: ' + str(self.num_bits) if self.num_bits is not None else ''}\n"
-            f"{'Number of Symbols: '
-               + str(self.num_symbols) if self.num_symbols is not None else ''}\n"
+            "Number of Symbols: " + str(self.num_symbols)
+            if self.num_symbols is not None
+            else "" + "\n"
             f"Constellation Type: '{self.constellation_type}'\n"
             f"Constellation Order: {self.constellation_order}\n"
             f"Prefix Type: {self.prefix_type}\n"

@@ -51,13 +51,20 @@ class ChannelModel(BaseModel):
         else:
             raise ValueError(f"Signal must be 1D or 2D, got {signal.ndim}D")
 
+        # Normalization
+        power = np.mean(np.abs(h) ** 2)
+        print("Channel impulse response power: ", power)
+        if power == 0:
+            raise ValueError("Channel impulse response has zero power.")
+        h = h / np.sqrt(power)
+        print("Normalized channel impulse response power: ", np.mean(np.abs(h) ** 2))
+
         # Convolution
         filtered_serialized = np.convolve(serialized, h, mode="full")
 
-        # Normalize channel energy
-        energy = np.sum(np.abs(h) ** 2)
-        if energy > 0:
-            filtered_serialized /= np.sqrt(energy)
+        # Normalize received power before noise (important for correct SNR)
+        rx_power = np.mean(np.abs(filtered_serialized) ** 2)
+        filtered_serialized /= np.sqrt(rx_power)
 
         # Add noise
         noisy_serialized = self.noise_model.add_noise(filtered_serialized, self.snr_db)  # type: ignore

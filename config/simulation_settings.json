@@ -5,9 +5,9 @@
     "channel_type": "CUSTOM",
     "num_symbols": 1000000,
     "constellation_order": 16,
-    "constellation_type": "PSK",
+    "constellation_type": "QAM",
     "noise_type": "AWGN",
-    "prefix_type": "ZERO",
+    "prefix_type": "CYCLIC",
     "prefix_length_ratio": 1,
     "equalization_method": "MMSE"
 }

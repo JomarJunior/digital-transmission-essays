@@ -1,21 +1,38 @@
+import time
+import threading
 import os
 from typing import Optional
 import numpy as np
 from PIL import Image
-from configuration.base import Settings, SimulationSettings
-from configuration.enums import PrefixType
-from equalization.factory import EqualizationFactory
-from modulation.base import (
+from src.configuration.base import Settings, SimulationSettings
+from src.configuration.enums import PrefixType
+from src.equalization.factory import EqualizationFactory
+from src.modulation.base import (
     CyclicPrefixScheme,
     NoPrefixScheme,
     OFDMModulator,
     SerialParallelConverter,
     ZeroPrefixScheme,
 )
-from simulation.base import CalculateBERStep, PlotConstellationStep, Simulation
-from bits_generator.base import BitsGenerator
-from channel.factory import ChannelFactory, ChannelType
-from symbol_mapping.factory import SymbolMapperFactory
+from src.simulation.base import CalculateBERStep, PlotConstellationStep, Simulation
+from src.bits_generator.base import BitsGenerator
+from src.channel.factory import ChannelFactory, ChannelType
+from src.symbol_mapping.factory import SymbolMapperFactory
+
+
+def calculate_time():
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            end_time = time.time()
+            print(f"Execution time of {func.__name__}: {end_time - start_time:.4f} seconds")
+            return result
+
+        return wrapper
+
+    return decorator
+
 
 if __name__ == "__main__":
     # Load general settings
@@ -124,11 +141,25 @@ if __name__ == "__main__":
         )
 
     print(f"Created {len(simulations)} simulations.")
+    threads = []
+
+    def save_plot_async(plot: Image.Image, full_path: str):
+        if plot is not None:
+            if not isinstance(plot, Image.Image):
+                print("Constellation plot is not a valid Image object.")
+                return
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            plot.save(full_path)
+            print(f"Constellation diagram saved to {full_path}")
+
     # Run Simulations
     for i, simulation in enumerate(simulations):
-        print("-" * 40)
+        print("/=" * 40)
         print(f"\nRunning Simulation {i+1} with SNR={sim_settings.signal_noise_ratios[i]} dB")
         results = simulation.run()
+        print("=/" * 40)
+        print(f"Simulation {i+1} completed.")
+        print("-" * 40)
         ber = results.get(CalculateBERStep.__output_key__, None)
         if ber is not None:
             print(f"Simulation {i+1} BER: {ber:.6f}")
@@ -146,16 +177,24 @@ if __name__ == "__main__":
         constellation_plot: Optional[Image.Image] = results.get(
             PlotConstellationStep.__output_key__, None
         )
-        if constellation_plot is not None:
-            if not isinstance(constellation_plot, Image.Image):
-                print("Constellation plot is not a valid Image object.")
-                continue
-            full_path = (
-                results.get("metadata", {})
-                .get("images", {})
-                .get("constellation_diagram_full_path", "images/constellation_diagram.png")
-            )
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            constellation_plot.save(full_path)
-            print(f"Constellation diagram saved to {full_path}")
-        print("\n" + "-" * 40 + "\n")
+        # Create a thread to save the plot asynchronously
+        plot_path = (
+            results.get("metadata", {})
+            .get("images", {})
+            .get(
+                "constellation_diagram_full_path",
+                f"images/constellation_diagram_snr_{sim_settings.signal_noise_ratios[i]}.png",
+            )  # pylint: disable=line-too-long
+        )
+        thread = threading.Thread(
+            target=save_plot_async,
+            args=(constellation_plot, plot_path),
+            daemon=True,
+        )
+        thread.start()
+        print("Saving constellation diagram in the background...")
+        threads.append(thread)
+
+    # Wait for all threads to finish
+    for thread in threads:
+        thread.join()
