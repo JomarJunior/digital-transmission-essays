@@ -175,8 +175,9 @@ class ModulationStep(BaseSimulationStep):
 class ChannelTransmissionStep(BaseSimulationStep):
     __output_key__ = "received_signal"
 
-    def __init__(self, channel: ChannelModel):
+    def __init__(self, channel: ChannelModel, converter: SerialParallelConverter):
         self.channel = channel
+        self.converter = converter
 
     def execute(self, data: ChainDataType) -> ChainDataType:
         """
@@ -189,7 +190,12 @@ class ChannelTransmissionStep(BaseSimulationStep):
             raise ValueError("Modulated signal not found in the data.")
 
         print(f"Input shape: {modulated_signal.shape}")
-        received_signal = self.channel.transmit(modulated_signal)
+
+        serial_modulated_signal = self.converter.to_serial(modulated_signal)
+        print(f"Serial modulated signal shape: {serial_modulated_signal.shape}")
+        received_signal = self.channel.transmit(serial_modulated_signal)
+        print(f"Received signal shape (serial): {received_signal.shape}")
+        received_signal = self.converter.to_parallel(received_signal, modulated_signal.shape[1])
         print(f"Output shape: {received_signal.shape}")
         print(f"Average received signal power: {np.mean(np.abs(received_signal) ** 2):.4f}")
         print(f"Peak received signal power: {np.max(np.abs(received_signal) ** 2):.4f}")
@@ -362,7 +368,9 @@ class CalculateBERStep(BaseSimulationStep):
         if output_bits is None:
             raise ValueError("Output bits not found in the data.")
         if len(input_bits) != len(output_bits):
-            raise ValueError("Input and output bits must have the same length.")
+            raise ValueError(
+                f"Input and output bits must have the same length: o:{len(output_bits)}, i:{len(input_bits)}"
+            )
 
         # Calculate BER
         num_errors = np.sum(np.array(input_bits) != np.array(output_bits))
@@ -654,6 +662,7 @@ class Simulation:
         # ------------------------------------------------------------------------------------------
         channel_transmission_step = ChannelTransmissionStep(
             channel=self.channel,
+            converter=self.serial_parallel_converter,
         )
         modulation_step.set_next(channel_transmission_step)
 

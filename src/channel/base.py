@@ -62,6 +62,9 @@ class ChannelModel(BaseModel):
         # Convolution
         filtered_serialized = np.convolve(serialized, h, mode="full")
 
+        # Remove extra samples added by 'full' convolution
+        filtered_serialized = filtered_serialized[: len(serialized)]
+
         # Normalize received power before noise (important for correct SNR)
         rx_power = np.mean(np.abs(filtered_serialized) ** 2)
         filtered_serialized /= np.sqrt(rx_power)

@@ -82,24 +82,42 @@ class ZeroPrefixScheme(IPrefixScheme):
         self.prefix_length = prefix_length
 
     def add_prefix(self, symbols: NDArray[complex128]) -> NDArray[complex128]:
-        """Add zero prefix to symbols."""
+        """Add zero suffix to symbols."""
+        print(f"Adding zero prefix of length {self.prefix_length}")
         if symbols.ndim == 1:
             prefix = np.zeros(self.prefix_length, dtype=symbols.dtype)
-            return np.concatenate((prefix, symbols))
+            return np.concatenate((symbols, prefix))
         if symbols.ndim == 2:
             prefix = np.zeros((symbols.shape[0], self.prefix_length), dtype=symbols.dtype)
-            return np.hstack((prefix, symbols))
+            return np.hstack((symbols, prefix))
 
         raise ValueError("Input symbols must be 1D or 2D array.")
 
     def remove_prefix(self, received_signal: NDArray[complex128]) -> NDArray[complex128]:
         """Remove zero prefix from received signal."""
+        ## @todo Add overlap-and-add
         if received_signal.ndim == 1:
-            return received_signal[self.prefix_length :]
+            return self._overlap_and_add(received_signal)
         if received_signal.ndim == 2:
-            return received_signal[:, self.prefix_length :]
+            return np.array([self._overlap_and_add(row) for row in received_signal])
 
         raise ValueError("Input received_signal must be 1D or 2D array.")
+
+    def _overlap_and_add(self, received_signal: NDArray[complex128]) -> NDArray[complex128]:
+        length: int = len(received_signal)
+        # Create the identity matrix
+        identity: NDArray[complex128] = np.identity(length - self.prefix_length, complex128)
+
+        # Create the overlap and add matrix with zeros
+        combined_matrix: NDArray[complex128] = identity.copy()
+        for i in range(self.prefix_length):
+            overlap_vector = np.zeros(length - self.prefix_length, dtype=complex128)
+            overlap_vector[i] = 1.0
+            # Concatenate the overlap vector to the combined matrix creating a new column
+            combined_matrix = np.hstack([combined_matrix, overlap_vector.reshape(-1, 1)])
+
+        # Perform matrix multiplication to achieve overlap and add
+        return combined_matrix @ received_signal
 
 
 class OFDMModulator(IModulator):
@@ -114,8 +132,12 @@ class OFDMModulator(IModulator):
         if symbols.shape[1] != self.num_subcarriers:
             raise ValueError("Number of symbols must match number of subcarriers.")
 
+        print(f"Symbols shape (before IFFT): {symbols.shape}")
+
         # Perform IFFT
         time_domain_signal = np.fft.ifft(symbols, axis=1, norm="ortho", n=self.num_subcarriers)
+
+        print(f"Time domain signal shape (after IFFT): {time_domain_signal.shape}")
 
         # Add prefix
         return self.prefix_scheme.add_prefix(time_domain_signal)

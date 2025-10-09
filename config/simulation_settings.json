@@ -7,7 +7,7 @@
     "constellation_order": 16,
     "constellation_type": "QAM",
     "noise_type": "AWGN",
-    "prefix_type": "CYCLIC",
+    "prefix_type": "ZERO",
     "prefix_length_ratio": 1,
     "equalization_method": "MMSE"
 }

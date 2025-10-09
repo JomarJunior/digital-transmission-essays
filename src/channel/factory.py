@@ -110,5 +110,5 @@ class ChannelFactory:
                 noise_type=noise_type,
                 time_response=time_response,
             ),
-            time_response.size,
+            time_response.size - 1,  # order
         )
